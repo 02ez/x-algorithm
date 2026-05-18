@@ -1,0 +1,26 @@
+schema = "1.0.0"
+
+[weights]
+reply_hook = 9
+dwell_length = 7
+shareability = 6
+media_presence = 8
+cta_placement = 6
+rage_bait = 10
+mute_keyword = 6
+overposting = 5
+
+[dwell]
+min_chars = 220
+
+[safety]
+blocked_terms = [
+    "competitor-x",
+    "do not link",
+]
+mute_risk_terms = [
+    "politics",
+    "election",
+    "crypto pump",
+    "nft drop",
+]
