@@ -1,0 +1,122 @@
+name: x-publish-lint
+
+on:
+  pull_request:
+    paths:
+      - "tools/x-publish-lint/**"
+      - ".github/workflows/x-publish-lint.yml"
+      - "drafts/**"
+      - "content/**"
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/x-publish-lint/**"
+      - ".github/workflows/x-publish-lint.yml"
+      - "drafts/**"
+      - "content/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: x-publish-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  X_PUBLISH_LINT_ROOT: ${{ github.workspace }}/tools/x-publish-lint
+
+jobs:
+  test-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: tools/x-publish-lint/pyproject.toml
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e "tools/x-publish-lint[dev]"
+
+      - name: Lint
+        working-directory: tools/x-publish-lint
+        run: ruff check .
+
+      - name: Tests
+        working-directory: tools/x-publish-lint
+        run: pytest -q
+
+      - name: List rules
+        run: x-publish-lint list-rules
+
+      - name: Compute base and head SHAs
+        id: range
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git fetch --no-tags --depth=0 origin "${{ github.base_ref }}" || true
+            BASE="$(git rev-parse "origin/${{ github.base_ref }}")"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+            if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+              BASE="$(git rev-list --max-parents=0 HEAD | tail -n 1)"
+            fi
+          fi
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          echo "head=$HEAD" >> "$GITHUB_OUTPUT"
+
+      - name: Audit changed drafts
+        id: audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/x-publish-lint
+          BASE="${{ steps.range.outputs.base }}"
+          HEAD="${{ steps.range.outputs.head }}"
+          mapfile -d '' CHANGED < <(
+            git diff --name-only -z "$BASE" "$HEAD" -- \
+              ':(glob)drafts/**/*.md' \
+              ':(glob)content/**/*.md' || true
+          )
+          if [ "${#CHANGED[@]}" -eq 0 ]; then
+            echo "No changed drafts to audit." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          FAIL=0
+          for draft in "${CHANGED[@]}"; do
+            [ -f "$draft" ] || continue
+            slug="${draft//\//_}"
+            out="reports/x-publish-lint/${slug%.md}.md"
+            echo "## $draft" >> "$GITHUB_STEP_SUMMARY"
+            if x-publish-lint audit "$draft" \
+                --format markdown --fail-on high > "$out"; then
+              echo "Audit passed." >> "$GITHUB_STEP_SUMMARY"
+            else
+              FAIL=1
+              echo "Audit failed (risk >= high)." >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            cat "$out" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          done
+          exit "$FAIL"
+
+      - name: Upload scorecards
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: x-publish-lint-scorecards
+          path: reports/x-publish-lint/**
+          if-no-files-found: ignore
