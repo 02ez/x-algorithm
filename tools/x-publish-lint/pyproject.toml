@@ -46,6 +46,7 @@ packages = ["src/x_publish_lint"]
 include = [
     "src/x_publish_lint",
     "configs",
+    "examples",
     "README.md",
     "ROADMAP.md",
     "pyproject.toml",
