@@ -157,6 +157,22 @@ def test_negative_action_rate_aggregates_all_four_signals() -> None:
     assert summary.negative_action_rate == pytest.approx(0.1)
 
 
+def test_rates_may_exceed_one() -> None:
+    # Rates are action-per-impression, not probabilities. Multiple negative
+    # actions per impression must be representable, not clamped away.
+    row = _row(
+        impressions=10,
+        not_interested=5,
+        mutes=5,
+        blocks=5,
+        reports=5,
+        replies=15,
+    )
+    summary = summarize_outcomes([row])
+    assert summary.negative_action_rate == pytest.approx(2.0)
+    assert summary.reply_rate == pytest.approx(1.5)
+
+
 def test_avg_dwell_ms_is_mean_across_rows() -> None:
     rows = [
         _row(draft_id="d-1", dwell_ms=100_000),
@@ -182,8 +198,8 @@ def test_summarize_sample_csv_end_to_end() -> None:
     # Totals match the fixture by hand: impressions = 12450+8730+21800+4520+15670
     assert summary.total_impressions == 63170
     assert summary.total_likes == 312 + 198 + 544 + 87 + 402
-    assert 0.0 <= summary.reply_rate <= 1.0
-    assert 0.0 <= summary.negative_action_rate <= 1.0
+    assert summary.reply_rate >= 0.0
+    assert summary.negative_action_rate >= 0.0
     assert summary.published_at_min == datetime(2026, 5, 1, 14, 30, tzinfo=UTC)
     assert summary.published_at_max == datetime(2026, 5, 5, 20, 10, tzinfo=UTC)
 

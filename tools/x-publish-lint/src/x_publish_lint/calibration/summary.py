@@ -56,10 +56,16 @@ class OutcomeSummary(BaseModel):
 
     avg_dwell_ms: float = Field(ge=0.0)
 
-    reply_rate: float = Field(ge=0.0, le=1.0)
-    repost_rate: float = Field(ge=0.0, le=1.0)
-    follow_rate: float = Field(ge=0.0, le=1.0)
-    negative_action_rate: float = Field(ge=0.0, le=1.0)
+    # Rates are action-per-impression, not probabilities. Multiple actions per
+    # impression (e.g. several negative signals on one view) can legitimately
+    # push these above 1.0, especially in aggregated or malformed inputs.
+    # Clamping with ``le=1`` would silently hide data-quality problems, so
+    # only the lower bound is enforced here. A later ``data_quality`` pass
+    # may flag suspicious rates explicitly.
+    reply_rate: float = Field(ge=0.0)
+    repost_rate: float = Field(ge=0.0)
+    follow_rate: float = Field(ge=0.0)
+    negative_action_rate: float = Field(ge=0.0)
 
 
 def _safe_rate(numerator: int, denominator: int) -> float:
