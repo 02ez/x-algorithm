@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from x_publish_lint.calibration import (
+    CURRENT_SCHEMA_VERSION,
     OUTCOME_COLUMNS,
     CalibrationFormatError,
     OutcomeRow,
@@ -32,6 +33,7 @@ def test_outcome_columns_are_stable() -> None:
     # Locking the canonical column order is part of the contract; failing this
     # test is a deliberate signal that downstream consumers must be updated.
     assert OUTCOME_COLUMNS == (
+        "schema_version",
         "draft_id",
         "client_id",
         "published_at",
@@ -50,9 +52,14 @@ def test_outcome_columns_are_stable() -> None:
     )
 
 
+def test_current_schema_version_is_one() -> None:
+    assert CURRENT_SCHEMA_VERSION == "1"
+
+
 def test_sample_csv_loads_cleanly() -> None:
     rows = load_outcomes(SAMPLE_CSV)
     assert len(rows) == 5
+    assert rows[0].schema_version == "1"
     assert rows[0].draft_id == "d-0001"
     assert rows[0].client_id == "default"
     assert rows[0].impressions == 12450
@@ -63,8 +70,8 @@ def test_sample_csv_loads_cleanly() -> None:
 def test_iter_outcomes_streams_in_source_order(tmp_path: Path) -> None:
     path = _write_csv(
         tmp_path,
-        "d-1,default,2026-01-01T00:00:00+00:00,1,0,0,0,0,0,0,0,0,0,0,0",
-        "d-2,default,2026-01-02T00:00:00+00:00,2,0,0,0,0,0,0,0,0,0,0,0",
+        "1,d-1,default,2026-01-01T00:00:00+00:00,1,0,0,0,0,0,0,0,0,0,0,0",
+        "1,d-2,default,2026-01-02T00:00:00+00:00,2,0,0,0,0,0,0,0,0,0,0,0",
     )
     ids = [row.draft_id for row in iter_outcomes(path)]
     assert ids == ["d-1", "d-2"]
@@ -99,15 +106,15 @@ def test_reordered_header_raises_format_error(tmp_path: Path) -> None:
 
 
 def test_wrong_field_count_raises(tmp_path: Path) -> None:
-    path = _write_csv(tmp_path, "d-1,default,2026-01-01T00:00:00+00:00,1,2,3")
-    with pytest.raises(CalibrationFormatError, match=r":2: expected 15 fields, got 6"):
+    path = _write_csv(tmp_path, "1,d-1,default,2026-01-01T00:00:00+00:00,1,2,3")
+    with pytest.raises(CalibrationFormatError, match=r":2: expected 16 fields, got 7"):
         load_outcomes(path)
 
 
 def test_negative_count_raises(tmp_path: Path) -> None:
     path = _write_csv(
         tmp_path,
-        "d-1,default,2026-01-01T00:00:00+00:00,1,-1,0,0,0,0,0,0,0,0,0,0",
+        "1,d-1,default,2026-01-01T00:00:00+00:00,1,-1,0,0,0,0,0,0,0,0,0,0",
     )
     with pytest.raises(CalibrationFormatError, match=r":2: invalid outcome row"):
         load_outcomes(path)
@@ -116,7 +123,7 @@ def test_negative_count_raises(tmp_path: Path) -> None:
 def test_naive_timestamp_rejected(tmp_path: Path) -> None:
     path = _write_csv(
         tmp_path,
-        "d-1,default,2026-01-01T00:00:00,1,0,0,0,0,0,0,0,0,0,0,0",
+        "1,d-1,default,2026-01-01T00:00:00,1,0,0,0,0,0,0,0,0,0,0,0",
     )
     with pytest.raises(CalibrationFormatError, match="timezone-aware"):
         load_outcomes(path)
@@ -125,7 +132,16 @@ def test_naive_timestamp_rejected(tmp_path: Path) -> None:
 def test_empty_draft_id_rejected(tmp_path: Path) -> None:
     path = _write_csv(
         tmp_path,
-        ",default,2026-01-01T00:00:00+00:00,1,0,0,0,0,0,0,0,0,0,0,0",
+        "1,,default,2026-01-01T00:00:00+00:00,1,0,0,0,0,0,0,0,0,0,0,0",
+    )
+    with pytest.raises(CalibrationFormatError, match=r":2: invalid outcome row"):
+        load_outcomes(path)
+
+
+def test_unsupported_schema_version_rejected(tmp_path: Path) -> None:
+    path = _write_csv(
+        tmp_path,
+        "2,d-1,default,2026-01-01T00:00:00+00:00,1,0,0,0,0,0,0,0,0,0,0,0",
     )
     with pytest.raises(CalibrationFormatError, match=r":2: invalid outcome row"):
         load_outcomes(path)
@@ -133,6 +149,7 @@ def test_empty_draft_id_rejected(tmp_path: Path) -> None:
 
 def test_outcome_row_is_frozen() -> None:
     row = OutcomeRow(
+        schema_version="1",
         draft_id="d-1",
         client_id="default",
         published_at=datetime(2026, 1, 1, tzinfo=UTC),
@@ -156,6 +173,7 @@ def test_outcome_row_is_frozen() -> None:
 def test_extra_field_rejected() -> None:
     with pytest.raises(ValidationError):
         OutcomeRow(
+            schema_version="1",
             draft_id="d-1",
             client_id="default",
             published_at=datetime(2026, 1, 1, tzinfo=UTC),

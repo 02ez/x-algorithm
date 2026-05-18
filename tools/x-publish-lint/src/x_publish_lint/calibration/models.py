@@ -8,14 +8,21 @@ by spreadsheets, manual exports, or analytics pipelines without bespoke tooling.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Final
+from typing import Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+#: Current calibration schema version. Bumped only on a breaking change to
+#: :data:`OUTCOME_COLUMNS` or :class:`OutcomeRow` semantics. Older files must
+#: continue to load under their original version once migration logic exists;
+#: until then the loader accepts exactly this value.
+CURRENT_SCHEMA_VERSION: Final[str] = "1"
 
 #: Canonical, ordered column names for the outcome CSV. The loader enforces
 #: that every input file declares exactly this header (order-sensitive) so
 #: downstream consumers can rely on a stable contract.
 OUTCOME_COLUMNS: Final[tuple[str, ...]] = (
+    "schema_version",
     "draft_id",
     "client_id",
     "published_at",
@@ -45,6 +52,9 @@ class OutcomeRow(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
 
+    schema_version: Literal["1"] = Field(
+        description="Calibration row schema version; locked to '1' in v1.2.",
+    )
     draft_id: str = Field(min_length=1, description="Stable identifier for the draft.")
     client_id: str = Field(
         min_length=1,

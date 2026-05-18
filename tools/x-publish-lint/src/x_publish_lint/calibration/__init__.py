@@ -17,9 +17,14 @@ from x_publish_lint.calibration.loader import (
     iter_outcomes,
     load_outcomes,
 )
-from x_publish_lint.calibration.models import OUTCOME_COLUMNS, OutcomeRow
+from x_publish_lint.calibration.models import (
+    CURRENT_SCHEMA_VERSION,
+    OUTCOME_COLUMNS,
+    OutcomeRow,
+)
 
 __all__ = [
+    "CURRENT_SCHEMA_VERSION",
     "OUTCOME_COLUMNS",
     "CalibrationFormatError",
     "OutcomeRow",
