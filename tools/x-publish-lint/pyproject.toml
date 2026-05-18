@@ -39,11 +39,15 @@ x-publish-lint = "x_publish_lint.cli:app"
 [tool.hatch.build.targets.wheel]
 packages = ["src/x_publish_lint"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/x_publish_lint/configs/default.toml" = "x_publish_lint/configs/default.toml"
+
 [tool.hatch.build.targets.sdist]
 include = [
     "src/x_publish_lint",
     "configs",
     "README.md",
+    "ROADMAP.md",
     "pyproject.toml",
 ]
 

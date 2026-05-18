@@ -12,11 +12,22 @@ Deterministic, rules-based linter for X/Twitter draft posts. **Advisory only** â
 
 ## Install
 
-From the repo root:
+From the repo root (editable dev install):
 
 ```bash
 python -m pip install -e "tools/x-publish-lint[dev]"
 ```
+
+As a wheel (works anywhere, no env vars needed):
+
+```bash
+python -m build --wheel tools/x-publish-lint
+python -m pip install tools/x-publish-lint/dist/x_publish_lint-0.1.0-py3-none-any.whl
+x-publish-lint list-rules
+x-publish-lint audit draft.md -f json
+```
+
+Wheel installs ship `configs/default.toml` as package data, so the CLI works from any directory without `X_PUBLISH_LINT_ROOT`. Client overrides still require an external `configs/clients/<client>.toml` and a resolvable tool root (set `X_PUBLISH_LINT_ROOT`).
 
 Requires Python 3.11+ (uses stdlib `tomllib`).
 
@@ -95,6 +106,9 @@ Tool root is resolved via, in order:
 1. `X_PUBLISH_LINT_ROOT` environment variable
 2. `<cwd>/tools/x-publish-lint` (monorepo layout)
 3. The editable install location (`Path(__file__).resolve().parents[2]`)
+4. If none of the above contain `configs/default.toml`, the loader falls back to the packaged default that ships inside the wheel (reported as `default (packaged)` in audit output).
+
+The packaged fallback only provides `default.toml`. Requesting a client override (`--client foo`) without a resolvable file-based tool root raises `FileNotFoundError`.
 
 ## Tests
 
