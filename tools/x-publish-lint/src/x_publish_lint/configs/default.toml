@@ -1,0 +1,22 @@
+schema = "1.0.0"
+
+[weights]
+reply_hook = 8
+dwell_length = 6
+shareability = 5
+media_presence = 7
+cta_placement = 5
+rage_bait = 20
+mute_keyword = 5
+overposting = 4
+
+[dwell]
+min_chars = 180
+
+[safety]
+blocked_terms = []
+mute_risk_terms = [
+    "politics",
+    "election",
+    "crypto pump",
+]

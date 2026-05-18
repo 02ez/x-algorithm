@@ -1,14 +1,24 @@
 # x-publish-lint Roadmap
 
-## Follow-up: package config files for non-editable installs
+## Done in v1.1: package default config for non-editable installs
 
-Currently v1 is repo/tooling oriented and relies on `X_PUBLISH_LINT_ROOT`, monorepo cwd, or editable install layout.
+`configs/default.toml` is shipped inside the wheel as package data at
+`x_publish_lint.configs.default.toml`. The loader resolves a file-based
+search root first (env var, cwd, editable install) and falls back to the
+packaged resource via `importlib.resources` when none is available. Client
+overrides (`--client <name>`) still require an external `configs/clients/<name>.toml`
+and a resolvable tool root.
 
-Before publishing to PyPI or using outside the repo, package `configs/default.toml` as package data or move defaults into code with override support.
+Verified acceptance:
 
-## Acceptance criteria
+- `python -m build --wheel tools/x-publish-lint` produces a wheel containing `x_publish_lint/configs/default.toml`.
+- `pip install dist/x_publish_lint-0.1.0-py3-none-any.whl` in a fresh venv outside the repo.
+- `x-publish-lint list-rules` prints 9 sorted rule IDs.
+- `x-publish-lint audit draft.md -f json` runs without `X_PUBLISH_LINT_ROOT` and reports `config_name: "default (packaged)"`.
 
-- `pip install dist/*.whl`
-- `x-publish-lint list-rules`
-- `x-publish-lint audit draft.md -f json`
-- Works outside repo root without `X_PUBLISH_LINT_ROOT`
+## Next
+
+- Calibration dataset format (synthetic + real exemplars, deterministic labels).
+- Outcome ingestion (post-publish results join keyed by draft hash).
+- Per-client weight tuning workflow.
+- Agent layer (last; behind a feature flag, still no network at runtime).

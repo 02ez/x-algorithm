@@ -37,21 +37,20 @@ _RISK_LEVEL_RANK: dict[RiskLevel, int] = {
 }
 
 
-def _resolve_root() -> Path:
-    """Locate the x-publish-lint tool root containing ``configs/default.toml``.
+def _resolve_root() -> Path | None:
+    """Locate a tool root containing ``configs/default.toml``, or ``None``.
 
     Resolution order:
         1. ``X_PUBLISH_LINT_ROOT`` environment variable, if set.
         2. ``<cwd>/tools/x-publish-lint`` when ``configs/default.toml`` exists there.
-        3. ``Path(__file__).resolve().parents[2]`` (editable install) when
+        3. ``Path(__file__).resolve().parents[2]`` (editable monorepo layout) when
            ``configs/default.toml`` exists there.
-        4. Otherwise raise :class:`FileNotFoundError`.
+        4. ``None`` — the loader will fall back to the packaged default that ships
+           inside the wheel.
 
     Returns:
-        The resolved tool root :class:`Path`.
-
-    Raises:
-        FileNotFoundError: When no candidate root contains ``configs/default.toml``.
+        A resolved tool root :class:`Path`, or ``None`` to indicate the loader
+        should use its packaged default.
     """
     env_root = os.getenv("X_PUBLISH_LINT_ROOT")
     if env_root:
@@ -65,11 +64,7 @@ def _resolve_root() -> Path:
     if (install_candidate / "configs" / "default.toml").exists():
         return install_candidate
 
-    raise FileNotFoundError(
-        "Could not locate x-publish-lint configs. Set the X_PUBLISH_LINT_ROOT "
-        "environment variable to the tool root (the directory containing "
-        "configs/default.toml)."
-    )
+    return None
 
 
 def _emit(text: str) -> None:
